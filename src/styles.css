@@ -543,6 +543,18 @@ nav button.nav-active {
   max-width: 980px;
 }
 
+.settings-subsection {
+  border-top: 1px solid #f0edf8;
+  margin-top: 18px;
+  padding-top: 18px;
+  display: grid;
+  gap: 13px;
+}
+
+.settings-subsection h2 {
+  margin-bottom: 0;
+}
+
 .form-grid,
 .settings-grid,
 .support-grid,

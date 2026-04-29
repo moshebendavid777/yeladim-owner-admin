@@ -8,6 +8,7 @@ import {
   Building2,
   CalendarDays,
   CheckCircle2,
+  Cloud,
   CreditCard,
   Database,
   DoorOpen,
@@ -1345,7 +1346,18 @@ function SupportPage({centers}) {
   );
 }
 
-function SettingsPage({apiUrl, setApiUrl, ownerToken, setOwnerToken}) {
+function SettingsPage({
+  apiUrl,
+  setApiUrl,
+  ownerToken,
+  setOwnerToken,
+  storageSettings,
+  setStorageSettings,
+}) {
+  const updateStorage = (key, value) => {
+    setStorageSettings(current => ({...current, [key]: value}));
+  };
+
   return (
     <section className="settings-grid">
       <div className="panel settings-panel">
@@ -1372,6 +1384,49 @@ function SettingsPage({apiUrl, setApiUrl, ownerToken, setOwnerToken}) {
             <option value="live">Live mode</option>
           </select>
         </label>
+        <div className="settings-subsection">
+          <h2>Media Storage</h2>
+          <p>Choose where center photos, videos, profiles, and documents are stored.</p>
+          <label>
+            Storage provider
+            <select
+              value={storageSettings.provider}
+              onChange={event => updateStorage('provider', event.target.value)}>
+              <option value="spaces">DigitalOcean Spaces</option>
+              <option value="s3">AWS S3</option>
+            </select>
+          </label>
+          <label>
+            Bucket / Space name
+            <input
+              value={storageSettings.bucket}
+              onChange={event => updateStorage('bucket', event.target.value)}
+            />
+          </label>
+          <label>
+            Region
+            <input
+              value={storageSettings.region}
+              onChange={event => updateStorage('region', event.target.value)}
+            />
+          </label>
+          <label>
+            Endpoint
+            <input
+              value={storageSettings.endpoint}
+              onChange={event => updateStorage('endpoint', event.target.value)}
+              placeholder="https://nyc3.digitaloceanspaces.com or AWS default"
+            />
+          </label>
+          <label>
+            Public CDN base URL
+            <input
+              value={storageSettings.cdnUrl}
+              onChange={event => updateStorage('cdnUrl', event.target.value)}
+              placeholder="Optional CDN URL"
+            />
+          </label>
+        </div>
         <div className="settings-actions">
           <button className="primary-button"><LifeBuoy size={18} /> Save Settings</button>
           <button className="secondary-button"><Bell size={18} /> Test Alert</button>
@@ -1383,6 +1438,7 @@ function SettingsPage({apiUrl, setApiUrl, ownerToken, setOwnerToken}) {
         <div className="endpoint-row"><ShieldCheck size={18} /> Owner-only API routes</div>
         <div className="endpoint-row"><Webhook size={18} /> Stripe and email webhooks</div>
         <div className="endpoint-row"><KeyRound size={18} /> Invite-code signup enforcement</div>
+        <div className="endpoint-row"><Cloud size={18} /> {storageSettings.provider === 'spaces' ? 'DigitalOcean Spaces' : 'AWS S3'} media storage</div>
       </aside>
     </section>
   );
@@ -1394,6 +1450,13 @@ function App() {
   const [passcode, setPasscode] = React.useState('demo');
   const [apiUrl, setApiUrl] = React.useState(apiBaseUrl);
   const [ownerToken, setOwnerToken] = React.useState('');
+  const [storageSettings, setStorageSettings] = React.useState({
+    provider: 'spaces',
+    bucket: 'yeladim-centers-staging',
+    region: 'nyc3',
+    endpoint: 'https://nyc3.digitaloceanspaces.com',
+    cdnUrl: '',
+  });
   const [centers, setCenters] = React.useState(initialCenters);
   const [auditEvents, setAuditEvents] = React.useState(initialAuditEvents);
   const [leads, setLeads] = React.useState(initialLeads);
@@ -1638,6 +1701,8 @@ function App() {
           setApiUrl={setApiUrl}
           ownerToken={ownerToken}
           setOwnerToken={setOwnerToken}
+          storageSettings={storageSettings}
+          setStorageSettings={setStorageSettings}
         />
       );
     }
