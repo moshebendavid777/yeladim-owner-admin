@@ -100,6 +100,52 @@ h2 {
   margin-top: 24px;
 }
 
+.login-environment-row,
+.settings-field {
+  display: grid;
+  gap: 9px;
+  color: #4a486f;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.environment-switch {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  padding: 5px;
+  border: 1px solid #e5e0f4;
+  border-radius: 16px;
+  background: #f8f5ff;
+}
+
+.environment-switch button {
+  min-height: 40px;
+  border: 0;
+  border-radius: 12px;
+  color: #5b5684;
+  background: transparent;
+  font-weight: 900;
+}
+
+.environment-switch button.active {
+  color: #fff;
+  background: #8c5cf6;
+  box-shadow: 0 10px 24px rgba(140, 92, 246, 0.24);
+}
+
+.settings-field code {
+  display: block;
+  overflow-wrap: anywhere;
+  border: 1px solid #e5e0f4;
+  border-radius: 14px;
+  padding: 13px 14px;
+  color: #4a486f;
+  background: #fff;
+  font-size: 13px;
+  font-weight: 800;
+}
+
 label {
   display: grid;
   gap: 7px;

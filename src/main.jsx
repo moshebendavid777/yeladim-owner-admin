@@ -34,7 +34,15 @@ import {
 import './styles.css';
 
 const leadStorageKey = 'yeladim_sales_leads';
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4100/v1';
+const apiEnvironments = {
+  test: import.meta.env.VITE_TEST_API_BASE_URL || 'http://localhost:4100/v1',
+  live: import.meta.env.VITE_API_BASE_URL || 'https://api.eynomer.com/v1',
+};
+const apiBaseUrl = apiEnvironments.live;
+
+function getApiModeFromUrl(url) {
+  return url === apiEnvironments.test ? 'test' : 'live';
+}
 
 const plans = {
   starter: {label: 'Starter', children: 40, storage: '50 GB', price: 129},
@@ -666,7 +674,24 @@ function CenterWorkspace({center, activeTab, setActiveTab, onUpdate}) {
   );
 }
 
-function LoginScreen({email, setEmail, passcode, setPasscode, apiUrl, setApiUrl, onSignIn, loginError}) {
+function EnvironmentSwitch({apiMode, onChange}) {
+  return (
+    <div className="environment-switch" role="group" aria-label="API environment">
+      {Object.entries(apiEnvironments).map(([mode, url]) => (
+        <button
+          key={mode}
+          type="button"
+          className={apiMode === mode ? 'active' : ''}
+          onClick={() => onChange(mode)}
+          title={url}>
+          {mode === 'test' ? 'Test' : 'Live'}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function LoginScreen({email, setEmail, passcode, setPasscode, apiMode, onApiModeChange, onSignIn, loginError}) {
   return (
     <main className="login-page">
       <section className="login-panel">
@@ -680,6 +705,10 @@ function LoginScreen({email, setEmail, passcode, setPasscode, apiUrl, setApiUrl,
           and security events from a separate owner dashboard.
         </p>
         <form onSubmit={onSignIn} className="login-form">
+          <div className="login-environment-row">
+            <span>Environment</span>
+            <EnvironmentSwitch apiMode={apiMode} onChange={onApiModeChange} />
+          </div>
           <label>
             Owner email
             <input
@@ -698,10 +727,6 @@ function LoginScreen({email, setEmail, passcode, setPasscode, apiUrl, setApiUrl,
               autoComplete="current-password"
               placeholder="Enter your password"
             />
-          </label>
-          <label>
-            API URL
-            <input value={apiUrl} onChange={event => setApiUrl(event.target.value)} />
           </label>
           <button type="submit">
             <LockKeyhole size={18} />
@@ -1468,7 +1493,8 @@ function SupportPage({centers}) {
 
 function SettingsPage({
   apiUrl,
-  setApiUrl,
+  apiMode,
+  onApiModeChange,
   ownerToken,
   setOwnerToken,
   storageSettings,
@@ -1483,10 +1509,11 @@ function SettingsPage({
       <div className="panel settings-panel">
         <h2>Owner Settings</h2>
         <p>Connect this owner dashboard to the standalone Yeladim API.</p>
-        <label>
-          Yeladim API URL
-          <input value={apiUrl} onChange={event => setApiUrl(event.target.value)} />
-        </label>
+        <div className="settings-field">
+          <span>Backend environment</span>
+          <EnvironmentSwitch apiMode={apiMode} onChange={onApiModeChange} />
+          <code>{apiUrl}</code>
+        </div>
         <label>
           Owner session token
           <input
@@ -1570,6 +1597,7 @@ function App() {
   const [passcode, setPasscode] = React.useState('');
   const [loginError, setLoginError] = React.useState('');
   const [currentUser, setCurrentUser] = React.useState(null);
+  const [apiMode, setApiModeValue] = React.useState(getApiModeFromUrl(apiBaseUrl));
   const [apiUrl, setApiUrl] = React.useState(apiBaseUrl);
   const [ownerToken, setOwnerToken] = React.useState('');
   const [storageSettings, setStorageSettings] = React.useState({
@@ -1592,6 +1620,11 @@ function App() {
 
   const selectedCenter =
     centers.find(center => center.id === selectedCenterId) || centers[0];
+
+  const setApiMode = mode => {
+    setApiModeValue(mode);
+    setApiUrl(apiEnvironments[mode]);
+  };
 
   React.useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -1679,7 +1712,7 @@ function App() {
       setSignedIn(true);
       await loadOwnerData(payload.token);
     } catch (error) {
-      setLoginError('Could not reach the Yeladim API. Check the API URL.');
+      setLoginError(`Could not reach the ${apiMode === 'test' ? 'test' : 'live'} Yeladim API.`);
     }
   };
 
@@ -1858,7 +1891,8 @@ function App() {
       return (
         <SettingsPage
           apiUrl={apiUrl}
-          setApiUrl={setApiUrl}
+          apiMode={apiMode}
+          onApiModeChange={setApiMode}
           ownerToken={ownerToken}
           setOwnerToken={setOwnerToken}
           storageSettings={storageSettings}
@@ -1907,8 +1941,8 @@ function App() {
         setEmail={setEmail}
         passcode={passcode}
         setPasscode={setPasscode}
-        apiUrl={apiUrl}
-        setApiUrl={setApiUrl}
+        apiMode={apiMode}
+        onApiModeChange={setApiMode}
         onSignIn={signIn}
         loginError={loginError}
       />
