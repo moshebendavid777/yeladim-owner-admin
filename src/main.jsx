@@ -34,14 +34,32 @@ import {
 import './styles.css';
 
 const leadStorageKey = 'yeladim_sales_leads';
+const ownerSessionStorageKey = 'yeladim_owner_session';
+const ownerSettingsStorageKey = 'yeladim_owner_settings';
 const apiEnvironments = {
   test: import.meta.env.VITE_TEST_API_BASE_URL || 'http://localhost:4100/v1',
   live: import.meta.env.VITE_API_BASE_URL || 'https://api.eynomer.com/v1',
 };
 const apiBaseUrl = apiEnvironments.live;
+const defaultStorageSettings = {
+  provider: 'spaces',
+  bucket: 'yeladim-centers-staging',
+  region: 'nyc3',
+  endpoint: 'https://nyc3.digitaloceanspaces.com',
+  cdnUrl: '',
+};
 
 function getApiModeFromUrl(url) {
   return url === apiEnvironments.test ? 'test' : 'live';
+}
+
+function readStoredJson(key, fallback) {
+  try {
+    return JSON.parse(localStorage.getItem(key) || 'null') || fallback;
+  } catch (error) {
+    console.warn(`Could not read ${key}`, error);
+    return fallback;
+  }
 }
 
 const plans = {
@@ -1499,6 +1517,8 @@ function SettingsPage({
   setOwnerToken,
   storageSettings,
   setStorageSettings,
+  saveState,
+  onSaveSettings,
 }) {
   const updateStorage = (key, value) => {
     setStorageSettings(current => ({...current, [key]: value}));
@@ -1575,9 +1595,30 @@ function SettingsPage({
           </label>
         </div>
         <div className="settings-actions">
-          <button className="primary-button"><LifeBuoy size={18} /> Save Settings</button>
+          <button className={`primary-button save-button ${saveState}`} onClick={onSaveSettings}>
+            {saveState === 'saved' ? <CheckCircle2 size={18} /> : <LifeBuoy size={18} />}
+            {saveState === 'saving'
+              ? 'Saving...'
+              : saveState === 'saved'
+                ? 'Saved'
+                : saveState === 'error'
+                  ? 'Saved Locally'
+                  : 'Save Settings'}
+          </button>
           <button className="secondary-button"><Bell size={18} /> Test Alert</button>
         </div>
+        {saveState === 'saved' && (
+          <div className="save-confirmation">
+            <CheckCircle2 size={18} />
+            Settings saved to the owner database.
+          </div>
+        )}
+        {saveState === 'error' && (
+          <div className="save-confirmation warning">
+            <AlertTriangle size={18} />
+            Saved in this browser. API save did not complete.
+          </div>
+        )}
       </div>
       <aside className="panel endpoint-panel">
         <h2>Backend Areas</h2>
@@ -1592,21 +1633,30 @@ function SettingsPage({
 }
 
 function App() {
-  const [signedIn, setSignedIn] = React.useState(false);
+  const storedSession = React.useMemo(
+    () => readStoredJson(ownerSessionStorageKey, null),
+    [],
+  );
+  const storedSettings = React.useMemo(
+    () => readStoredJson(ownerSettingsStorageKey, null),
+    [],
+  );
+  const savedApiMode = storedSession?.apiMode || storedSettings?.apiMode || getApiModeFromUrl(apiBaseUrl);
+  const initialApiMode = apiEnvironments[savedApiMode] ? savedApiMode : getApiModeFromUrl(apiBaseUrl);
+  const initialApiUrl = apiEnvironments[initialApiMode] || apiBaseUrl;
+  const [signedIn, setSignedIn] = React.useState(Boolean(storedSession?.token && storedSession?.user));
   const [email, setEmail] = React.useState('');
   const [passcode, setPasscode] = React.useState('');
   const [loginError, setLoginError] = React.useState('');
-  const [currentUser, setCurrentUser] = React.useState(null);
-  const [apiMode, setApiModeValue] = React.useState(getApiModeFromUrl(apiBaseUrl));
-  const [apiUrl, setApiUrl] = React.useState(apiBaseUrl);
-  const [ownerToken, setOwnerToken] = React.useState('');
+  const [currentUser, setCurrentUser] = React.useState(storedSession?.user || null);
+  const [apiMode, setApiModeValue] = React.useState(initialApiMode);
+  const [apiUrl, setApiUrl] = React.useState(initialApiUrl);
+  const [ownerToken, setOwnerToken] = React.useState(storedSession?.token || '');
   const [storageSettings, setStorageSettings] = React.useState({
-    provider: 'spaces',
-    bucket: 'yeladim-centers-staging',
-    region: 'nyc3',
-    endpoint: 'https://nyc3.digitaloceanspaces.com',
-    cdnUrl: '',
+    ...defaultStorageSettings,
+    ...(storedSettings?.storageSettings || {}),
   });
+  const [settingsSaveState, setSettingsSaveState] = React.useState('idle');
   const [centers, setCenters] = React.useState(initialCenters);
   const [auditEvents, setAuditEvents] = React.useState(initialAuditEvents);
   const [leads, setLeads] = React.useState(initialLeads);
@@ -1624,6 +1674,50 @@ function App() {
   const setApiMode = mode => {
     setApiModeValue(mode);
     setApiUrl(apiEnvironments[mode]);
+  };
+
+  const saveSession = React.useCallback((token, user, mode) => {
+    localStorage.setItem(ownerSessionStorageKey, JSON.stringify({
+      token,
+      user,
+      apiMode: mode,
+      savedAt: new Date().toISOString(),
+    }));
+  }, []);
+
+  const clearSession = () => {
+    localStorage.removeItem(ownerSessionStorageKey);
+    setSignedIn(false);
+    setOwnerToken('');
+    setCurrentUser(null);
+    setPasscode('');
+  };
+
+  const saveOwnerSettings = async () => {
+    setSettingsSaveState('saving');
+    localStorage.setItem(ownerSettingsStorageKey, JSON.stringify({
+      apiMode,
+      storageSettings,
+      savedAt: new Date().toISOString(),
+    }));
+    try {
+      if (ownerToken) {
+        const response = await fetch(`${apiUrl}/owner/settings`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json', Authorization: `Bearer ${ownerToken}`},
+          body: JSON.stringify({storage_settings: storageSettings}),
+        });
+        if (!response.ok) {
+          throw new Error('Could not save owner settings');
+        }
+      }
+      setSettingsSaveState('saved');
+    } catch (error) {
+      console.warn('Owner settings API unavailable, saved in this browser only', error);
+      setSettingsSaveState('error');
+    } finally {
+      window.setTimeout(() => setSettingsSaveState('idle'), 2600);
+    }
   };
 
   React.useEffect(() => {
@@ -1659,10 +1753,11 @@ function App() {
   const loadOwnerData = React.useCallback(
     async token => {
       try {
-        const [leadsResponse, invitesResponse, usersResponse] = await Promise.all([
+        const [leadsResponse, invitesResponse, usersResponse, settingsResponse] = await Promise.all([
           fetch(`${apiUrl}/owner/leads`, {headers: {Authorization: `Bearer ${token}`}}),
           fetch(`${apiUrl}/owner/invite-codes`, {headers: {Authorization: `Bearer ${token}`}}),
           fetch(`${apiUrl}/owner/users`, {headers: {Authorization: `Bearer ${token}`}}),
+          fetch(`${apiUrl}/owner/settings`, {headers: {Authorization: `Bearer ${token}`}}),
         ]);
         if (leadsResponse.ok) {
           const payload = await leadsResponse.json();
@@ -1682,12 +1777,25 @@ function App() {
           const payload = await usersResponse.json();
           setOwnerUsers(payload.users || []);
         }
+        if (settingsResponse.ok) {
+          const payload = await settingsResponse.json();
+          const savedStorageSettings = payload.settings?.storage_settings || payload.settings?.storageSettings;
+          if (savedStorageSettings) {
+            setStorageSettings(current => ({...current, ...savedStorageSettings}));
+          }
+        }
       } catch (error) {
         console.warn('Owner API unavailable, using demo data', error);
       }
     },
     [apiUrl],
   );
+
+  React.useEffect(() => {
+    if (signedIn && ownerToken) {
+      loadOwnerData(ownerToken);
+    }
+  }, [loadOwnerData, ownerToken, signedIn]);
 
   const signIn = async event => {
     event.preventDefault();
@@ -1709,8 +1817,8 @@ function App() {
       }
       setOwnerToken(payload.token);
       setCurrentUser(payload.user);
+      saveSession(payload.token, payload.user, apiMode);
       setSignedIn(true);
-      await loadOwnerData(payload.token);
     } catch (error) {
       setLoginError(`Could not reach the ${apiMode === 'test' ? 'test' : 'live'} Yeladim API.`);
     }
@@ -1897,6 +2005,8 @@ function App() {
           setOwnerToken={setOwnerToken}
           storageSettings={storageSettings}
           setStorageSettings={setStorageSettings}
+          saveState={settingsSaveState}
+          onSaveSettings={saveOwnerSettings}
         />
       );
     }
@@ -1985,12 +2095,7 @@ function App() {
         </div>
         <button
           className="logout-button"
-          onClick={() => {
-            setSignedIn(false);
-            setOwnerToken('');
-            setCurrentUser(null);
-            setPasscode('');
-          }}>
+          onClick={clearSession}>
           <LogOut size={18} />
           Sign out
         </button>

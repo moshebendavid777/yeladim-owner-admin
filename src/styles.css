@@ -534,6 +534,26 @@ nav button.nav-active {
   color: #fff;
   background: #8c5cf6;
   box-shadow: 0 12px 26px rgba(140, 92, 246, 0.22);
+  transition: transform 180ms ease, background 180ms ease, box-shadow 180ms ease;
+}
+
+.primary-button:hover {
+  transform: translateY(-1px);
+}
+
+.save-button.saving {
+  opacity: 0.78;
+}
+
+.save-button.saved {
+  background: #141447;
+  box-shadow: 0 12px 26px rgba(20, 20, 71, 0.22);
+  animation: savePulse 420ms ease;
+}
+
+.save-button.error {
+  background: #c2410c;
+  box-shadow: 0 12px 26px rgba(194, 65, 12, 0.18);
 }
 
 .secondary-button,
@@ -606,6 +626,58 @@ nav button.nav-active {
 
 .settings-subsection h2 {
   margin-bottom: 0;
+}
+
+.save-confirmation {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  border: 1px solid rgba(140, 92, 246, 0.2);
+  border-radius: 14px;
+  padding: 10px 12px;
+  color: #4a486f;
+  background: #f8f5ff;
+  font-size: 13px;
+  font-weight: 850;
+  animation: saveSlide 260ms ease;
+}
+
+.save-confirmation svg {
+  color: #8c5cf6;
+}
+
+.save-confirmation.warning {
+  border-color: rgba(194, 65, 12, 0.22);
+  color: #7c2d12;
+  background: #fff7ed;
+}
+
+.save-confirmation.warning svg {
+  color: #c2410c;
+}
+
+@keyframes savePulse {
+  0% {
+    transform: scale(0.98);
+  }
+  60% {
+    transform: scale(1.03);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes saveSlide {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .form-grid,
