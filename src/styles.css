@@ -138,6 +138,13 @@ select:focus {
   font-weight: 900;
 }
 
+.login-error {
+  margin: 0;
+  color: #b91c1c;
+  font-size: 13px;
+  font-weight: 850;
+}
+
 .app-shell {
   min-height: 100vh;
   display: grid;
@@ -746,6 +753,19 @@ nav button.nav-active {
 
 .lead-actions button {
   min-height: 38px;
+}
+
+.role-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 4px 0 16px;
+}
+
+.role-picker button:disabled {
+  cursor: not-allowed;
+  opacity: 0.82;
 }
 
 .invite-layout {

@@ -193,6 +193,14 @@ const initialInviteCodes = [
   },
 ];
 
+const ownerRoleOptions = [
+  {id: 'owner', label: 'Owner'},
+  {id: 'sales', label: 'Sales'},
+  {id: 'support', label: 'Support'},
+  {id: 'billing', label: 'Billing'},
+  {id: 'security', label: 'Security'},
+];
+
 const centerTabs = [
   {id: 'overview', label: 'Overview', icon: Activity},
   {id: 'rooms', label: 'Rooms', icon: DoorOpen},
@@ -303,6 +311,7 @@ const tenantRecords = {
 const navItems = [
   {id: 'overview', label: 'Overview', icon: Activity},
   {id: 'leads', label: 'Leads', icon: Mail},
+  {id: 'owner-users', label: 'Owner Users', icon: UserCog},
   {id: 'centers', label: 'Centers', icon: Building2},
   {id: 'invites', label: 'Invite Codes', icon: LockKeyhole},
   {id: 'billing', label: 'Billing', icon: CreditCard},
@@ -316,6 +325,7 @@ const navItems = [
 const pageTitles = {
   overview: ['Platform overview', 'Centers, licenses, billing, and risk'],
   leads: ['Sales leads', 'Demo requests, pricing inquiries, and follow-up pipeline'],
+  'owner-users': ['Owner users', 'Control who can access this platform admin'],
   centers: ['Centers', 'Create tenants and manage center profiles'],
   invites: ['Invite codes', 'Control who can create an account for each center'],
   billing: ['Billing', 'Payments, subscriptions, invoices, and delinquency'],
@@ -656,7 +666,7 @@ function CenterWorkspace({center, activeTab, setActiveTab, onUpdate}) {
   );
 }
 
-function LoginScreen({email, setEmail, passcode, setPasscode, apiUrl, setApiUrl, onSignIn}) {
+function LoginScreen({email, setEmail, passcode, setPasscode, apiUrl, setApiUrl, onSignIn, loginError}) {
   return (
     <main className="login-page">
       <section className="login-panel">
@@ -672,14 +682,21 @@ function LoginScreen({email, setEmail, passcode, setPasscode, apiUrl, setApiUrl,
         <form onSubmit={onSignIn} className="login-form">
           <label>
             Owner email
-            <input value={email} onChange={event => setEmail(event.target.value)} />
+            <input
+              value={email}
+              onChange={event => setEmail(event.target.value)}
+              autoComplete="username"
+              placeholder="you@example.com"
+            />
           </label>
           <label>
-            Passcode
+            Password
             <input
               value={passcode}
               onChange={event => setPasscode(event.target.value)}
               type="password"
+              autoComplete="current-password"
+              placeholder="Enter your password"
             />
           </label>
           <label>
@@ -690,6 +707,7 @@ function LoginScreen({email, setEmail, passcode, setPasscode, apiUrl, setApiUrl,
             <LockKeyhole size={18} />
             Enter Owner Admin
           </button>
+          {loginError && <p className="login-error">{loginError}</p>}
         </form>
       </section>
     </main>
@@ -1127,6 +1145,108 @@ function LeadsPage({leads, onStatusChange}) {
   );
 }
 
+function OwnerUsersPage({users, onCreateUser}) {
+  const [draft, setDraft] = React.useState({
+    full_name: '',
+    email: '',
+    password: '',
+    roles: ['owner'],
+  });
+
+  const toggleRole = role => {
+    if (role === 'owner') {
+      return;
+    }
+    setDraft(current => {
+      const hasRole = current.roles.includes(role);
+      const roles = hasRole
+        ? current.roles.filter(item => item !== role)
+        : [...current.roles, role];
+      return {...current, roles: [...new Set(['owner', ...roles])]};
+    });
+  };
+
+  return (
+    <section className="invite-layout">
+      <section className="panel">
+        <div className="panel-header">
+          <div>
+            <h2>Create Owner User</h2>
+            <p>Add people who can access this platform admin with specific roles.</p>
+          </div>
+        </div>
+        <div className="form-grid invite-form">
+          <label>
+            Full name
+            <input
+              value={draft.full_name}
+              onChange={event => setDraft(current => ({...current, full_name: event.target.value}))}
+            />
+          </label>
+          <label>
+            Email
+            <input
+              value={draft.email}
+              onChange={event => setDraft(current => ({...current, email: event.target.value}))}
+            />
+          </label>
+          <label>
+            Temporary password
+            <input
+              type="password"
+              value={draft.password}
+              onChange={event => setDraft(current => ({...current, password: event.target.value}))}
+            />
+          </label>
+        </div>
+        <div className="role-picker">
+          {ownerRoleOptions.map(role => (
+            <button
+              key={role.id}
+              className={draft.roles.includes(role.id) ? 'primary-button' : 'secondary-button'}
+              disabled={role.id === 'owner'}
+              onClick={() => toggleRole(role.id)}>
+              {role.label}
+            </button>
+          ))}
+        </div>
+        <div className="form-actions">
+          <button
+            className="primary-button"
+            onClick={() => {
+              onCreateUser(draft);
+              setDraft({full_name: '', email: '', password: '', roles: ['owner']});
+            }}>
+            <UserCog size={18} />
+            Create User
+          </button>
+        </div>
+      </section>
+
+      <section className="panel">
+        <div className="panel-header">
+          <div>
+            <h2>Platform Access</h2>
+            <p>Only these users can sign into the owner app.</p>
+          </div>
+        </div>
+        <div className="invite-list">
+          {users.map(user => (
+            <article className="invite-card" key={user.id}>
+              <div>
+                <strong>{user.full_name || user.email}</strong>
+                <span>{user.email}</span>
+              </div>
+              <Pill value={(user.roles || []).join(', ')} tone="trial" />
+              <span>{user.created_at || 'Active'}</span>
+            </article>
+          ))}
+        </div>
+      </section>
+    </section>
+  );
+}
+
 function InviteCodesPage({centers, invites, onCreateInvite}) {
   const [draft, setDraft] = React.useState({
     center_id: centers[0]?.id || '',
@@ -1446,8 +1566,10 @@ function SettingsPage({
 
 function App() {
   const [signedIn, setSignedIn] = React.useState(false);
-  const [email, setEmail] = React.useState('owner@yeladim.app');
-  const [passcode, setPasscode] = React.useState('demo');
+  const [email, setEmail] = React.useState('');
+  const [passcode, setPasscode] = React.useState('');
+  const [loginError, setLoginError] = React.useState('');
+  const [currentUser, setCurrentUser] = React.useState(null);
   const [apiUrl, setApiUrl] = React.useState(apiBaseUrl);
   const [ownerToken, setOwnerToken] = React.useState('');
   const [storageSettings, setStorageSettings] = React.useState({
@@ -1461,6 +1583,7 @@ function App() {
   const [auditEvents, setAuditEvents] = React.useState(initialAuditEvents);
   const [leads, setLeads] = React.useState(initialLeads);
   const [invites, setInvites] = React.useState(initialInviteCodes);
+  const [ownerUsers, setOwnerUsers] = React.useState([]);
   const [query, setQuery] = React.useState('');
   const [activePage, setActivePage] = React.useState('overview');
   const [activeCenterTab, setActiveCenterTab] = React.useState('overview');
@@ -1500,21 +1623,13 @@ function App() {
     }
   }, []);
 
-  React.useEffect(() => {
-    const loadOwnerData = async () => {
+  const loadOwnerData = React.useCallback(
+    async token => {
       try {
-        const loginResponse = await fetch(`${apiBaseUrl}/auth/login`, {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({email: 'owner@yeladim.app', password: 'demo'}),
-        });
-        if (!loginResponse.ok) {
-          return;
-        }
-        const {token} = await loginResponse.json();
-        const [leadsResponse, invitesResponse] = await Promise.all([
-          fetch(`${apiBaseUrl}/owner/leads`, {headers: {Authorization: `Bearer ${token}`}}),
-          fetch(`${apiBaseUrl}/owner/invite-codes`, {headers: {Authorization: `Bearer ${token}`}}),
+        const [leadsResponse, invitesResponse, usersResponse] = await Promise.all([
+          fetch(`${apiUrl}/owner/leads`, {headers: {Authorization: `Bearer ${token}`}}),
+          fetch(`${apiUrl}/owner/invite-codes`, {headers: {Authorization: `Bearer ${token}`}}),
+          fetch(`${apiUrl}/owner/users`, {headers: {Authorization: `Bearer ${token}`}}),
         ]);
         if (leadsResponse.ok) {
           const payload = await leadsResponse.json();
@@ -1530,19 +1645,42 @@ function App() {
             return [...payload.invite_codes.filter(invite => !knownIds.has(invite.id)), ...current];
           });
         }
+        if (usersResponse.ok) {
+          const payload = await usersResponse.json();
+          setOwnerUsers(payload.users || []);
+        }
       } catch (error) {
         console.warn('Owner API unavailable, using demo data', error);
       }
-    };
-    loadOwnerData();
-  }, []);
+    },
+    [apiUrl],
+  );
 
-  const signIn = event => {
+  const signIn = async event => {
     event.preventDefault();
-    if (email !== 'owner@yeladim.app' || passcode !== 'demo') {
-      return;
+    setLoginError('');
+    try {
+      const response = await fetch(`${apiUrl}/auth/login`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({email, password: passcode}),
+      });
+      if (!response.ok) {
+        setLoginError('Invalid owner credentials or missing owner role.');
+        return;
+      }
+      const payload = await response.json();
+      if (!payload.user?.roles?.includes('owner')) {
+        setLoginError('This account does not have owner-platform access.');
+        return;
+      }
+      setOwnerToken(payload.token);
+      setCurrentUser(payload.user);
+      setSignedIn(true);
+      await loadOwnerData(payload.token);
+    } catch (error) {
+      setLoginError('Could not reach the Yeladim API. Check the API URL.');
     }
-    setSignedIn(true);
   };
 
   const updateCenter = (centerId, patch) => {
@@ -1583,16 +1721,10 @@ function App() {
       used_count: 0,
     };
     try {
-      const loginResponse = await fetch(`${apiBaseUrl}/auth/login`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({email: 'owner@yeladim.app', password: 'demo'}),
-      });
-      if (loginResponse.ok) {
-        const {token} = await loginResponse.json();
-        const response = await fetch(`${apiBaseUrl}/owner/invite-codes`, {
+      if (ownerToken) {
+        const response = await fetch(`${apiUrl}/owner/invite-codes`, {
           method: 'POST',
-          headers: {'Content-Type': 'application/json', Authorization: `Bearer ${token}`},
+          headers: {'Content-Type': 'application/json', Authorization: `Bearer ${ownerToken}`},
           body: JSON.stringify({
             center_id: draft.center_id,
             label: draft.label,
@@ -1610,6 +1742,30 @@ function App() {
       console.warn('Invite API unavailable, using local fallback', error);
     }
     setInvites(current => [invite, ...current]);
+  };
+
+  const createOwnerUser = async draft => {
+    let user = {
+      id: `owner-user-${Date.now()}`,
+      ...draft,
+      created_at: 'Just now',
+    };
+    try {
+      if (ownerToken) {
+        const response = await fetch(`${apiUrl}/owner/users`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json', Authorization: `Bearer ${ownerToken}`},
+          body: JSON.stringify(draft),
+        });
+        if (response.ok) {
+          const payload = await response.json();
+          user = payload.user;
+        }
+      }
+    } catch (error) {
+      console.warn('Owner user API unavailable, using local fallback', error);
+    }
+    setOwnerUsers(current => [user, ...current]);
   };
 
   const saveCenter = () => {
@@ -1676,6 +1832,10 @@ function App() {
 
     if (activePage === 'leads') {
       return <LeadsPage leads={leads} onStatusChange={updateLeadStatus} />;
+    }
+
+    if (activePage === 'owner-users') {
+      return <OwnerUsersPage users={ownerUsers} onCreateUser={createOwnerUser} />;
     }
 
     if (activePage === 'invites') {
@@ -1750,6 +1910,7 @@ function App() {
         apiUrl={apiUrl}
         setApiUrl={setApiUrl}
         onSignIn={signIn}
+        loginError={loginError}
       />
     );
   }
@@ -1788,7 +1949,14 @@ function App() {
           <strong>Owner-only access</strong>
           <span>MFA, audit logging, and server-side authorization required before production.</span>
         </div>
-        <button className="logout-button" onClick={() => setSignedIn(false)}>
+        <button
+          className="logout-button"
+          onClick={() => {
+            setSignedIn(false);
+            setOwnerToken('');
+            setCurrentUser(null);
+            setPasscode('');
+          }}>
           <LogOut size={18} />
           Sign out
         </button>
@@ -1801,6 +1969,7 @@ function App() {
             <h1>{pageTitles[activePage][1]}</h1>
           </div>
           <div className="topbar-actions">
+            {currentUser && <div className="api-pill">{currentUser.email}</div>}
             <div className="api-pill">{apiUrl}</div>
             <button className="primary-button" onClick={startCreateCenter}>
               <Plus size={18} />
