@@ -33,7 +33,7 @@ import {
 import './styles.css';
 
 const leadStorageKey = 'yeladim_sales_leads';
-const apiBaseUrl = 'http://localhost:4100/v1';
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4100/v1';
 
 const plans = {
   starter: {label: 'Starter', children: 40, storage: '50 GB', price: 129},
@@ -1392,7 +1392,7 @@ function App() {
   const [signedIn, setSignedIn] = React.useState(false);
   const [email, setEmail] = React.useState('owner@yeladim.app');
   const [passcode, setPasscode] = React.useState('demo');
-  const [apiUrl, setApiUrl] = React.useState('http://localhost:4100/v1');
+  const [apiUrl, setApiUrl] = React.useState(apiBaseUrl);
   const [ownerToken, setOwnerToken] = React.useState('');
   const [centers, setCenters] = React.useState(initialCenters);
   const [auditEvents, setAuditEvents] = React.useState(initialAuditEvents);
